@@ -1,0 +1,49 @@
+# Environment & Credentials
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+serviceAccountKey.json
+
+# Node & Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Python & Machine Learning
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.pytest_cache/
+*.joblib
+!ml/models/*.joblib
+
+# Kotlin / Spring Boot / Java
+.gradle/
+build/
+bin/
+out/
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+android/.gradle
+ios/Pods/
+
+# OS Files
+.DS_Store
+Thumbs.db

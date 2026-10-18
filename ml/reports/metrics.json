@@ -1,0 +1,91 @@
+{
+  "selected_model": "Random Forest",
+  "feature_columns": [
+    "Pregnancies",
+    "Glucose",
+    "BloodPressure",
+    "SkinThickness",
+    "Insulin",
+    "BMI",
+    "DiabetesPedigreeFunction",
+    "Age"
+  ],
+  "models_evaluated": {
+    "Dummy Baseline": {
+      "accuracy": 0.6494,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "roc_auc": 0.5,
+      "cv_roc_auc_mean": 0.5,
+      "cv_roc_auc_std": 0.0,
+      "confusion_matrix": [
+        [
+          100,
+          0
+        ],
+        [
+          54,
+          0
+        ]
+      ]
+    },
+    "Logistic Regression": {
+      "accuracy": 0.7078,
+      "precision": 0.6,
+      "recall": 0.5,
+      "f1_score": 0.5455,
+      "roc_auc": 0.813,
+      "cv_roc_auc_mean": 0.843,
+      "cv_roc_auc_std": 0.0291,
+      "confusion_matrix": [
+        [
+          82,
+          18
+        ],
+        [
+          27,
+          27
+        ]
+      ]
+    },
+    "Decision Tree": {
+      "accuracy": 0.7662,
+      "precision": 0.65,
+      "recall": 0.7222,
+      "f1_score": 0.6842,
+      "roc_auc": 0.784,
+      "cv_roc_auc_mean": 0.7474,
+      "cv_roc_auc_std": 0.0225,
+      "confusion_matrix": [
+        [
+          79,
+          21
+        ],
+        [
+          15,
+          39
+        ]
+      ]
+    },
+    "Random Forest": {
+      "accuracy": 0.7403,
+      "precision": 0.6667,
+      "recall": 0.5185,
+      "f1_score": 0.5833,
+      "roc_auc": 0.8167,
+      "cv_roc_auc_mean": 0.8316,
+      "cv_roc_auc_std": 0.0199,
+      "confusion_matrix": [
+        [
+          86,
+          14
+        ],
+        [
+          26,
+          28
+        ]
+      ]
+    }
+  }
+}

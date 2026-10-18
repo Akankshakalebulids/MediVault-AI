@@ -1,0 +1,14 @@
+# MediVault AI — Git Line Ending Normalization
+* text=auto eol=lf
+
+# Binary files — no line ending conversion
+*.joblib binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.jar binary
+*.zip binary
+*.gz binary
+*.pdf binary
