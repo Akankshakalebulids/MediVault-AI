@@ -25,7 +25,8 @@ import {
   getTimelineEvents,
   isCloudMode
 } from "./services/firestoreService";
-import { X, Plus, Bell, CheckCircle2, AlertCircle, Cloud, HardDrive } from "lucide-react";
+import { backendService } from "./services/backendService";
+import { X, Plus, Bell, CheckCircle2, AlertCircle, Cloud, HardDrive, Server } from "lucide-react";
 
 export function App() {
   const { currentUser, isDemoMode, isFirebaseConfigured } = useAuth();
@@ -43,6 +44,7 @@ export function App() {
   const [meds, setMeds] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [timelineEvents, setTimelineEvents] = useState([]);
+  const [isBackendConnected, setIsBackendConnected] = useState(false);
 
   // Operation Feedback Status
   const [cloudError, setCloudError] = useState(null);
@@ -60,6 +62,29 @@ export function App() {
   useEffect(() => {
     async function loadData() {
       setCloudError(null);
+      // 1. Check if Spring Boot backend is healthy
+      const health = await backendService.checkHealth();
+      if (health.ok) {
+        setIsBackendConnected(true);
+        try {
+          const [recs, md, apts, tl] = await Promise.all([
+            backendService.getRecords(userId),
+            backendService.getMedications(userId),
+            backendService.getAppointments(userId),
+            backendService.getTimeline(userId)
+          ]);
+          setRecords(Array.isArray(recs) ? recs : []);
+          setMeds(Array.isArray(md) ? md : []);
+          setAppointments(Array.isArray(apts) ? apts : []);
+          setTimelineEvents(Array.isArray(tl) ? tl : []);
+          return;
+        } catch (err) {
+          console.warn("Spring Boot backend query failed, falling back:", err);
+        }
+      }
+
+      // 2. Fall back to Cloud Firestore / Local Storage Demo
+      setIsBackendConnected(false);
       try {
         const [recs, md, apts, tl] = await Promise.all([
           getMedicalRecords(userId),
@@ -83,13 +108,19 @@ export function App() {
     setTimeout(() => setCloudSuccess(null), 4000);
   }
 
-  // Handlers with explicit error tracking
+  // Handlers with backend support & fallback
   async function handleAddRecord(rec) {
     setCloudError(null);
     try {
-      const saved = await addMedicalRecord(userId, rec);
-      setRecords((prev) => [saved, ...prev]);
-      showSuccess(inCloudMode ? "Medical record saved to Cloud Firestore." : "Medical record saved locally.");
+      if (isBackendConnected) {
+        const saved = await backendService.createRecord(userId, rec);
+        setRecords((prev) => [saved, ...prev]);
+        showSuccess("Medical record saved via Spring Boot REST API.");
+      } else {
+        const saved = await addMedicalRecord(userId, rec);
+        setRecords((prev) => [saved, ...prev]);
+        showSuccess(inCloudMode ? "Medical record saved to Cloud Firestore." : "Medical record saved locally.");
+      }
     } catch (err) {
       setCloudError(err.message);
     }
@@ -98,9 +129,15 @@ export function App() {
   async function handleDeleteRecord(id) {
     setCloudError(null);
     try {
-      await deleteMedicalRecord(userId, id);
-      setRecords((prev) => prev.filter((r) => r.id !== id));
-      showSuccess(inCloudMode ? "Record deleted from Cloud Firestore." : "Record removed locally.");
+      if (isBackendConnected) {
+        await backendService.deleteRecord(id, userId);
+        setRecords((prev) => prev.filter((r) => r.id !== id));
+        showSuccess("Record removed via Spring Boot REST API.");
+      } else {
+        await deleteMedicalRecord(userId, id);
+        setRecords((prev) => prev.filter((r) => r.id !== id));
+        showSuccess(inCloudMode ? "Record deleted from Cloud Firestore." : "Record removed locally.");
+      }
     } catch (err) {
       setCloudError(err.message);
     }
@@ -109,9 +146,15 @@ export function App() {
   async function handleAddMed(med) {
     setCloudError(null);
     try {
-      const saved = await addMedication(userId, med);
-      setMeds((prev) => [...prev, saved]);
-      showSuccess(inCloudMode ? "Medication saved to Cloud Firestore." : "Medication saved locally.");
+      if (isBackendConnected) {
+        const saved = await backendService.createMedication(userId, med);
+        setMeds((prev) => [...prev, saved]);
+        showSuccess("Medication saved via Spring Boot REST API.");
+      } else {
+        const saved = await addMedication(userId, med);
+        setMeds((prev) => [...prev, saved]);
+        showSuccess(inCloudMode ? "Medication saved to Cloud Firestore." : "Medication saved locally.");
+      }
     } catch (err) {
       setCloudError(err.message);
     }
@@ -120,9 +163,15 @@ export function App() {
   async function handleUpdateMed(id, updates) {
     setCloudError(null);
     try {
-      await updateMedication(userId, id, updates);
-      setMeds((prev) => prev.map((m) => (m.id === id ? { ...m, ...updates } : m)));
-      showSuccess(inCloudMode ? "Medication updated in Cloud Firestore." : "Medication updated locally.");
+      if (isBackendConnected) {
+        const updated = await backendService.updateMedication(id, userId, updates);
+        setMeds((prev) => prev.map((m) => (m.id === id ? { ...m, ...updated } : m)));
+        showSuccess("Medication updated via Spring Boot REST API.");
+      } else {
+        await updateMedication(userId, id, updates);
+        setMeds((prev) => prev.map((m) => (m.id === id ? { ...m, ...updates } : m)));
+        showSuccess(inCloudMode ? "Medication updated in Cloud Firestore." : "Medication updated locally.");
+      }
     } catch (err) {
       setCloudError(err.message);
     }
@@ -131,9 +180,15 @@ export function App() {
   async function handleDeleteMed(id) {
     setCloudError(null);
     try {
-      await deleteMedication(userId, id);
-      setMeds((prev) => prev.filter((m) => m.id !== id));
-      showSuccess(inCloudMode ? "Medication removed from Cloud Firestore." : "Medication removed locally.");
+      if (isBackendConnected) {
+        await backendService.deleteMedication(id, userId);
+        setMeds((prev) => prev.filter((m) => m.id !== id));
+        showSuccess("Medication removed via Spring Boot REST API.");
+      } else {
+        await deleteMedication(userId, id);
+        setMeds((prev) => prev.filter((m) => m.id !== id));
+        showSuccess(inCloudMode ? "Medication removed from Cloud Firestore." : "Medication removed locally.");
+      }
     } catch (err) {
       setCloudError(err.message);
     }
@@ -142,9 +197,15 @@ export function App() {
   async function handleAddAppt(appt) {
     setCloudError(null);
     try {
-      const saved = await addAppointment(userId, appt);
-      setAppointments((prev) => [...prev, saved]);
-      showSuccess(inCloudMode ? "Appointment scheduled in Cloud Firestore." : "Appointment scheduled locally.");
+      if (isBackendConnected) {
+        const saved = await backendService.createAppointment(userId, appt);
+        setAppointments((prev) => [...prev, saved]);
+        showSuccess("Appointment scheduled via Spring Boot REST API.");
+      } else {
+        const saved = await addAppointment(userId, appt);
+        setAppointments((prev) => [...prev, saved]);
+        showSuccess(inCloudMode ? "Appointment scheduled in Cloud Firestore." : "Appointment scheduled locally.");
+      }
     } catch (err) {
       setCloudError(err.message);
     }
@@ -153,9 +214,15 @@ export function App() {
   async function handleUpdateAppt(id, updates) {
     setCloudError(null);
     try {
-      await updateAppointment(userId, id, updates);
-      setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, ...updates } : a)));
-      showSuccess(inCloudMode ? "Appointment updated in Cloud Firestore." : "Appointment updated locally.");
+      if (isBackendConnected) {
+        const updated = await backendService.updateAppointment(id, userId, updates);
+        setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, ...updated } : a)));
+        showSuccess("Appointment updated via Spring Boot REST API.");
+      } else {
+        await updateAppointment(userId, id, updates);
+        setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, ...updates } : a)));
+        showSuccess(inCloudMode ? "Appointment updated in Cloud Firestore." : "Appointment updated locally.");
+      }
     } catch (err) {
       setCloudError(err.message);
     }
@@ -257,8 +324,18 @@ export function App() {
           {/* System Storage State Banner */}
           <div
             style={{
-              background: inCloudMode ? "var(--bg-soft-green)" : "#FFFBEB",
-              border: `1px solid ${inCloudMode ? "var(--border-light)" : "#FDE68A"}`,
+              background: isBackendConnected
+                ? "#EFF6FF"
+                : inCloudMode
+                ? "var(--bg-soft-green)"
+                : "#FFFBEB",
+              border: `1px solid ${
+                isBackendConnected
+                  ? "#BFDBFE"
+                  : inCloudMode
+                  ? "var(--border-light)"
+                  : "#FDE68A"
+              }`,
               borderRadius: "var(--radius-md)",
               padding: "10px 14px",
               marginBottom: 20,
@@ -271,16 +348,34 @@ export function App() {
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {inCloudMode ? (
+              {isBackendConnected ? (
+                <Server size={16} style={{ color: "#2563EB" }} />
+              ) : inCloudMode ? (
                 <Cloud size={16} style={{ color: "var(--primary-emerald)" }} />
               ) : (
                 <HardDrive size={16} style={{ color: "#B45309" }} />
               )}
-              <span style={{ color: inCloudMode ? "var(--dark-green)" : "#92400E" }}>
-                <strong>{inCloudMode ? "Cloud Persistence Active:" : "Local Demo Mode Active:"}</strong>{" "}
-                {inCloudMode
+              <span
+                style={{
+                  color: isBackendConnected
+                    ? "#1E40AF"
+                    : inCloudMode
+                    ? "var(--dark-green)"
+                    : "#92400E"
+                }}
+              >
+                <strong>
+                  {isBackendConnected
+                    ? "Spring Boot REST Backend Connected (Port 8085):"
+                    : inCloudMode
+                    ? "Cloud Persistence Active:"
+                    : "Local Demo Mode Active:"}
+                </strong>{" "}
+                {isBackendConnected
+                  ? `Authenticated as UID ${userId}. CRUD operations synchronized directly to Spring Boot H2/PostgreSQL database.`
+                  : inCloudMode
                   ? `Authenticated as UID ${currentUser?.uid}. All collections (/users/${currentUser?.uid}/...) sync directly to Cloud Firestore.`
-                  : "Changes are stored in your browser local storage. Configure Firebase credentials in web/.env to activate live Cloud Firestore sync."}
+                  : "Changes stored in browser local storage. Start backend on port 8085 or configure Firebase to activate live sync."}
               </span>
             </div>
             <button
@@ -288,7 +383,11 @@ export function App() {
               style={{
                 background: "none",
                 border: "none",
-                color: inCloudMode ? "var(--primary-emerald)" : "#B45309",
+                color: isBackendConnected
+                  ? "#2563EB"
+                  : inCloudMode
+                  ? "var(--primary-emerald)"
+                  : "#B45309",
                 fontWeight: 700,
                 cursor: "pointer",
                 textDecoration: "underline",

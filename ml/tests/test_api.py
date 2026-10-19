@@ -1,6 +1,17 @@
+"""
+MediVault AI — ML API Test Suite (SMLD Academic Evidence)
+Run from project root:  python -m pytest ml/tests/ -v
+Run from ml/ directory: python -m pytest tests/ -v
+"""
+import sys
+import os
 import pytest
 from fastapi.testclient import TestClient
-from ml.api import app
+
+# Ensure the ml/ package root is on the path regardless of where pytest is invoked
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from api import app
 
 client = TestClient(app)
 
@@ -66,3 +77,31 @@ def test_input_validation():
     }
     res = client.post("/api/v1/predict/diabetes", json=bad_payload)
     assert res.status_code == 422  # Pydantic Unprocessable Entity
+
+def test_missing_required_fields():
+    # Missing required glucose field
+    incomplete_payload = {
+        "pregnancies": 0,
+        "bmi": 24.5,
+        "age": 30
+    }
+    res = client.post("/api/v1/predict/diabetes", json=incomplete_payload)
+    assert res.status_code == 422
+
+def test_boundary_values():
+    # Boundary tests: minimum valid glucose (40) and valid maximums
+    boundary_payload = {
+        "pregnancies": 0,
+        "glucose": 40.0,
+        "bloodPressure": 40.0,
+        "skinThickness": 0.0,
+        "insulin": 0.0,
+        "bmi": 15.0,
+        "diabetesPedigreeFunction": 0.08,
+        "age": 18
+    }
+    res = client.post("/api/v1/predict/diabetes", json=boundary_payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["riskLevel"] == "Low Risk"
+

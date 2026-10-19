@@ -5,6 +5,25 @@ import jakarta.validation.constraints.NotBlank
 import java.time.LocalDateTime
 
 @Entity
+@Table(name = "user_profiles")
+data class UserProfileEntity(
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long? = null,
+
+    @Column(nullable = false, unique = true)
+    var userId: String = "",
+
+    var displayName: String = "",
+    var email: String = "",
+    var bloodGroup: String = "O+",
+    var dateOfBirth: String = "",
+    var emergencyContact: String = "",
+    var phone: String = "",
+    var updatedAt: LocalDateTime = LocalDateTime.now()
+)
+
+@Entity
 @Table(name = "medical_records")
 data class MedicalRecordEntity(
     @Id
@@ -73,5 +92,23 @@ data class AppointmentEntity(
     var reason: String = "",
     var status: String = "Confirmed",
     var notes: String = "",
+    var createdAt: LocalDateTime = LocalDateTime.now()
+)
+
+@Entity
+@Table(name = "timeline_events")
+data class TimelineEventEntity(
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long? = null,
+
+    @Column(nullable = false)
+    var userId: String = "default_user",
+
+    var type: String = "GENERAL",
+    var title: String = "",
+    var description: String = "",
+    var date: String = "",
+    var category: String = "General",
     var createdAt: LocalDateTime = LocalDateTime.now()
 )

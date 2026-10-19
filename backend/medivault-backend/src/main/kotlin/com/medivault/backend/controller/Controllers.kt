@@ -1,217 +1,291 @@
 package com.medivault.backend.controller
 
 import com.medivault.backend.dto.*
-import com.medivault.backend.model.AppointmentEntity
-import com.medivault.backend.model.MedicalRecordEntity
-import com.medivault.backend.model.MedicationEntity
-import com.medivault.backend.repository.AppointmentRepository
-import com.medivault.backend.repository.MedicalRecordRepository
-import com.medivault.backend.repository.MedicationRepository
+import com.medivault.backend.service.*
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Health Check Controller
+// ═══════════════════════════════════════════════════════════════════════════════
+
+@RestController
+class HealthController {
+    private val startTime = System.currentTimeMillis()
+
+    @GetMapping("/health")
+    fun health(): HealthCheckResponse {
+        val uptimeMs = System.currentTimeMillis() - startTime
+        val uptimeSec = uptimeMs / 1000
+        val hours = uptimeSec / 3600
+        val minutes = (uptimeSec % 3600) / 60
+        val seconds = uptimeSec % 60
+        return HealthCheckResponse(
+            status = "healthy",
+            service = "MediVault Spring Boot Backend",
+            version = "1.0.0",
+            database = "H2 (dev) / PostgreSQL (prod)",
+            uptime = "${hours}h ${minutes}m ${seconds}s"
+        )
+    }
+
+    @GetMapping("/api/v1/health")
+    fun apiHealth(): HealthCheckResponse = health()
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// User Profile Controller
+// ═══════════════════════════════════════════════════════════════════════════════
+
+@RestController
+@RequestMapping("/api/v1/profile")
+class UserProfileController(
+    private val profileService: UserProfileService
+) {
+    @GetMapping
+    fun getProfile(
+        @RequestParam(defaultValue = "demo_user") userId: String
+    ): ResponseEntity<UserProfileResponse> {
+        val profile = profileService.getOrCreateProfile(userId)
+        return ResponseEntity.ok(UserProfileResponse(
+            id = profile.id!!,
+            userId = profile.userId,
+            displayName = profile.displayName,
+            email = profile.email,
+            bloodGroup = profile.bloodGroup,
+            dateOfBirth = profile.dateOfBirth,
+            emergencyContact = profile.emergencyContact,
+            phone = profile.phone,
+            updatedAt = profile.updatedAt.toString()
+        ))
+    }
+
+    @PutMapping
+    fun updateProfile(
+        @RequestParam(defaultValue = "demo_user") userId: String,
+        @RequestBody request: UserProfileRequest
+    ): ResponseEntity<UserProfileResponse> {
+        val profile = profileService.upsertProfile(userId, request)
+        return ResponseEntity.ok(UserProfileResponse(
+            id = profile.id!!,
+            userId = profile.userId,
+            displayName = profile.displayName,
+            email = profile.email,
+            bloodGroup = profile.bloodGroup,
+            dateOfBirth = profile.dateOfBirth,
+            emergencyContact = profile.emergencyContact,
+            phone = profile.phone,
+            updatedAt = profile.updatedAt.toString()
+        ))
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Medical Records Controller
+// ═══════════════════════════════════════════════════════════════════════════════
+
 @RestController
 @RequestMapping("/api/v1/records")
 class MedicalRecordController(
-    private val recordRepo: MedicalRecordRepository
+    private val recordService: MedicalRecordService
 ) {
     @GetMapping
     fun getAllRecords(
         @RequestParam(defaultValue = "demo_user") userId: String,
         @RequestParam(required = false) category: String?
-    ): List<MedicalRecordEntity> {
-        return if (category != null && category != "All") {
-            recordRepo.findByUserIdAndCategory(userId, category)
-        } else {
-            recordRepo.findByUserId(userId)
-        }
+    ): ResponseEntity<List<MedicalRecordResponse>> {
+        val records = recordService.getRecords(userId, category)
+        return ResponseEntity.ok(records.map { it.toResponse() })
+    }
+
+    @GetMapping("/{id}")
+    fun getRecord(
+        @PathVariable id: Long,
+        @RequestParam(defaultValue = "demo_user") userId: String
+    ): ResponseEntity<MedicalRecordResponse> {
+        val record = recordService.getRecordById(id, userId)
+        return ResponseEntity.ok(record.toResponse())
     }
 
     @PostMapping
     fun createRecord(
         @RequestParam(defaultValue = "demo_user") userId: String,
         @Valid @RequestBody req: MedicalRecordRequest
-    ): ResponseEntity<MedicalRecordEntity> {
-        val entity = MedicalRecordEntity(
-            userId = userId,
-            title = req.title,
-            category = req.category,
-            doctor = req.doctor,
-            facility = req.facility,
-            date = req.date,
-            diagnosisNotes = req.diagnosisNotes,
-            status = req.status
-        )
-        val saved = recordRepo.save(entity)
-        return ResponseEntity.status(HttpStatus.CREATED).body(saved)
+    ): ResponseEntity<MedicalRecordResponse> {
+        val saved = recordService.createRecord(userId, req)
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved.toResponse())
+    }
+
+    @PutMapping("/{id}")
+    fun updateRecord(
+        @PathVariable id: Long,
+        @RequestParam(defaultValue = "demo_user") userId: String,
+        @RequestBody req: MedicalRecordUpdateRequest
+    ): ResponseEntity<MedicalRecordResponse> {
+        val updated = recordService.updateRecord(id, userId, req)
+        return ResponseEntity.ok(updated.toResponse())
     }
 
     @DeleteMapping("/{id}")
-    fun deleteRecord(@PathVariable id: Long): ResponseEntity<Void> {
-        return if (recordRepo.existsById(id)) {
-            recordRepo.deleteById(id)
-            ResponseEntity.noContent().build()
-        } else {
-            ResponseEntity.notFound().build()
-        }
+    fun deleteRecord(
+        @PathVariable id: Long,
+        @RequestParam(defaultValue = "demo_user") userId: String
+    ): ResponseEntity<Void> {
+        recordService.deleteRecord(id, userId)
+        return ResponseEntity.noContent().build()
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Medications Controller
+// ═══════════════════════════════════════════════════════════════════════════════
 
 @RestController
 @RequestMapping("/api/v1/medications")
 class MedicationController(
-    private val medRepo: MedicationRepository
+    private val medicationService: MedicationService
 ) {
     @GetMapping
     fun getMedications(
         @RequestParam(defaultValue = "demo_user") userId: String
-    ): List<MedicationEntity> {
-        return medRepo.findByUserId(userId)
+    ): ResponseEntity<List<MedicationResponse>> {
+        val meds = medicationService.getMedications(userId)
+        return ResponseEntity.ok(meds.map { it.toResponse() })
     }
 
     @PostMapping
     fun createMedication(
         @RequestParam(defaultValue = "demo_user") userId: String,
         @Valid @RequestBody req: MedicationRequest
-    ): ResponseEntity<MedicationEntity> {
-        val entity = MedicationEntity(
-            userId = userId,
-            name = req.name,
-            dose = req.dose,
-            frequency = req.frequency,
-            time = req.time,
-            status = req.status,
-            instructions = req.instructions,
-            startDate = req.startDate
-        )
-        val saved = medRepo.save(entity)
-        return ResponseEntity.status(HttpStatus.CREATED).body(saved)
+    ): ResponseEntity<MedicationResponse> {
+        val saved = medicationService.createMedication(userId, req)
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved.toResponse())
     }
 
     @PutMapping("/{id}")
     fun updateMedication(
         @PathVariable id: Long,
-        @RequestBody updates: Map<String, Any>
-    ): ResponseEntity<MedicationEntity> {
-        val existing = medRepo.findById(id)
-        if (existing.isEmpty) return ResponseEntity.notFound().build()
-
-        val med = existing.get()
-        updates["status"]?.let { med.status = it.toString() }
-        updates["time"]?.let { med.time = it.toString() }
-        updates["dose"]?.let { med.dose = it.toString() }
-        val saved = medRepo.save(med)
-        return ResponseEntity.ok(saved)
+        @RequestParam(defaultValue = "demo_user") userId: String,
+        @RequestBody req: MedicationUpdateRequest
+    ): ResponseEntity<MedicationResponse> {
+        val updated = medicationService.updateMedication(id, userId, req)
+        return ResponseEntity.ok(updated.toResponse())
     }
 
     @DeleteMapping("/{id}")
-    fun deleteMedication(@PathVariable id: Long): ResponseEntity<Void> {
-        return if (medRepo.existsById(id)) {
-            medRepo.deleteById(id)
-            ResponseEntity.noContent().build()
-        } else {
-            ResponseEntity.notFound().build()
-        }
+    fun deleteMedication(
+        @PathVariable id: Long,
+        @RequestParam(defaultValue = "demo_user") userId: String
+    ): ResponseEntity<Void> {
+        medicationService.deleteMedication(id, userId)
+        return ResponseEntity.noContent().build()
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Appointments Controller
+// ═══════════════════════════════════════════════════════════════════════════════
 
 @RestController
 @RequestMapping("/api/v1/appointments")
 class AppointmentController(
-    private val apptRepo: AppointmentRepository
+    private val appointmentService: AppointmentService
 ) {
     @GetMapping
     fun getAppointments(
         @RequestParam(defaultValue = "demo_user") userId: String
-    ): List<AppointmentEntity> {
-        return apptRepo.findByUserId(userId)
+    ): ResponseEntity<List<AppointmentResponse>> {
+        val appts = appointmentService.getAppointments(userId)
+        return ResponseEntity.ok(appts.map { it.toResponse() })
     }
 
     @PostMapping
     fun createAppointment(
         @RequestParam(defaultValue = "demo_user") userId: String,
         @Valid @RequestBody req: AppointmentRequest
-    ): ResponseEntity<AppointmentEntity> {
-        val entity = AppointmentEntity(
-            userId = userId,
-            doctorName = req.doctorName,
-            specialty = req.specialty,
-            clinicLocation = req.clinicLocation,
-            dateTime = req.dateTime,
-            reason = req.reason,
-            status = req.status,
-            notes = req.notes
-        )
-        val saved = apptRepo.save(entity)
-        return ResponseEntity.status(HttpStatus.CREATED).body(saved)
+    ): ResponseEntity<AppointmentResponse> {
+        val saved = appointmentService.createAppointment(userId, req)
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved.toResponse())
     }
 
     @PutMapping("/{id}")
     fun updateAppointment(
         @PathVariable id: Long,
-        @RequestBody updates: Map<String, Any>
-    ): ResponseEntity<AppointmentEntity> {
-        val existing = apptRepo.findById(id)
-        if (existing.isEmpty) return ResponseEntity.notFound().build()
+        @RequestParam(defaultValue = "demo_user") userId: String,
+        @RequestBody req: AppointmentUpdateRequest
+    ): ResponseEntity<AppointmentResponse> {
+        val updated = appointmentService.updateAppointment(id, userId, req)
+        return ResponseEntity.ok(updated.toResponse())
+    }
 
-        val appt = existing.get()
-        updates["status"]?.let { appt.status = it.toString() }
-        val saved = apptRepo.save(appt)
-        return ResponseEntity.ok(saved)
+    @DeleteMapping("/{id}")
+    fun deleteAppointment(
+        @PathVariable id: Long,
+        @RequestParam(defaultValue = "demo_user") userId: String
+    ): ResponseEntity<Void> {
+        appointmentService.deleteAppointment(id, userId)
+        return ResponseEntity.noContent().build()
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Health Timeline Controller
+// ═══════════════════════════════════════════════════════════════════════════════
 
 @RestController
 @RequestMapping("/api/v1/timeline")
 class HealthTimelineController(
-    private val recordRepo: MedicalRecordRepository,
-    private val medRepo: MedicationRepository,
-    private val apptRepo: AppointmentRepository
+    private val timelineService: TimelineService
 ) {
     @GetMapping
     fun getTimeline(
         @RequestParam(defaultValue = "demo_user") userId: String
-    ): List<TimelineEventResponse> {
-        val events = mutableListOf<TimelineEventResponse>()
-
-        recordRepo.findByUserId(userId).forEach { r ->
-            events.add(
-                TimelineEventResponse(
-                    id = "rec-${r.id}",
-                    title = "Medical Record: ${r.title}",
-                    description = "${r.category} reviewed at ${r.facility} under ${r.doctor}.",
-                    date = r.date,
-                    category = "Record"
-                )
-            )
-        }
-
-        apptRepo.findByUserId(userId).forEach { a ->
-            events.add(
-                TimelineEventResponse(
-                    id = "apt-${a.id}",
-                    title = "Care Visit: ${a.doctorName}",
-                    description = "${a.specialty} consultation at ${a.clinicLocation} (${a.status}).",
-                    date = a.dateTime.split("T").firstOrNull() ?: a.dateTime,
-                    category = "Appointment"
-                )
-            )
-        }
-
-        medRepo.findByUserId(userId).forEach { m ->
-            events.add(
-                TimelineEventResponse(
-                    id = "med-${m.id}",
-                    title = "Prescription Logged: ${m.name}",
-                    description = "Dosage ${m.dose} · Schedule ${m.frequency} at ${m.time}.",
-                    date = m.startDate.ifBlank { "2026-03-01" },
-                    category = "Medication"
-                )
-            )
-        }
-
-        return events.sortedByDescending { it.date }
+    ): ResponseEntity<List<TimelineEventResponse>> {
+        return ResponseEntity.ok(timelineService.getTimeline(userId))
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Entity → Response Extension Functions
+// ═══════════════════════════════════════════════════════════════════════════════
+
+private fun com.medivault.backend.model.MedicalRecordEntity.toResponse() = MedicalRecordResponse(
+    id = id!!,
+    userId = userId,
+    title = title,
+    category = category,
+    doctor = doctor,
+    facility = facility,
+    date = date,
+    diagnosisNotes = diagnosisNotes,
+    status = status,
+    createdAt = createdAt.toString()
+)
+
+private fun com.medivault.backend.model.MedicationEntity.toResponse() = MedicationResponse(
+    id = id!!,
+    userId = userId,
+    name = name,
+    dose = dose,
+    frequency = frequency,
+    time = time,
+    status = status,
+    instructions = instructions,
+    startDate = startDate,
+    createdAt = createdAt.toString()
+)
+
+private fun com.medivault.backend.model.AppointmentEntity.toResponse() = AppointmentResponse(
+    id = id!!,
+    userId = userId,
+    doctorName = doctorName,
+    specialty = specialty,
+    clinicLocation = clinicLocation,
+    dateTime = dateTime,
+    reason = reason,
+    status = status,
+    notes = notes,
+    createdAt = createdAt.toString()
+)

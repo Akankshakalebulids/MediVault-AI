@@ -122,3 +122,59 @@ class DiabetesPredictionResult {
     );
   }
 }
+
+class TimelineEvent {
+  final String id;
+  final String title;
+  final String description;
+  final String date;
+  final String category;
+  final String type;
+
+  TimelineEvent({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.date,
+    required this.category,
+    this.type = 'GENERAL',
+  });
+
+  factory TimelineEvent.fromJson(Map<String, dynamic> json) {
+    return TimelineEvent(
+      id: json['id']?.toString() ?? '',
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
+      date: json['date'] ?? '',
+      category: json['category'] ?? 'Event',
+      type: json['type'] ?? 'GENERAL',
+    );
+  }
+}
+
+class UserProfile {
+  final String displayName;
+  final String email;
+  final String bloodGroup;
+  final String emergencyContact;
+  final String phone;
+
+  UserProfile({
+    required this.displayName,
+    required this.email,
+    required this.bloodGroup,
+    required this.emergencyContact,
+    required this.phone,
+  });
+
+  factory UserProfile.fromJson(Map<String, dynamic> json) {
+    return UserProfile(
+      displayName: json['displayName'] ?? 'Demo Patient',
+      email: json['email'] ?? 'patient@medivault.local',
+      bloodGroup: json['bloodGroup'] ?? 'O+',
+      emergencyContact: json['emergencyContact'] ?? '+1 555-0199',
+      phone: json['phone'] ?? '+1 555-0100',
+    );
+  }
+}
+

@@ -97,6 +97,58 @@ class ApiService {
     return demoAppts;
   }
 
+  Future<List<TimelineEvent>> fetchTimeline() async {
+    try {
+      final res = await http.get(Uri.parse('$backendBaseUrl/timeline')).timeout(const Duration(seconds: 3));
+      if (res.statusCode == 200) {
+        final List list = jsonDecode(res.body);
+        return list.map((e) => TimelineEvent.fromJson(e)).toList();
+      }
+    } catch (_) {}
+    return [
+      TimelineEvent(
+        id: 'tl-1',
+        title: 'Comprehensive Metabolic Panel (CMP)',
+        description: 'Fasting blood glucose 98 mg/dL (normal).',
+        date: '2026-09-28',
+        category: 'Laboratory',
+        type: 'RECORD',
+      ),
+      TimelineEvent(
+        id: 'tl-2',
+        title: 'Prescription Started: Vitamin D3',
+        description: 'Dose: 1000 IU Once daily at 08:00 AM.',
+        date: '2026-09-15',
+        category: 'Medication',
+        type: 'MEDICATION',
+      ),
+      TimelineEvent(
+        id: 'tl-3',
+        title: 'Endocrine Consultation',
+        description: 'Routine preventative checkup with Dr. Rajesh Shah.',
+        date: '2026-09-12',
+        category: 'Consultation',
+        type: 'RECORD',
+      ),
+    ];
+  }
+
+  Future<UserProfile> fetchProfile() async {
+    try {
+      final res = await http.get(Uri.parse('$backendBaseUrl/profile')).timeout(const Duration(seconds: 3));
+      if (res.statusCode == 200) {
+        return UserProfile.fromJson(jsonDecode(res.body));
+      }
+    } catch (_) {}
+    return UserProfile(
+      displayName: 'Alex Carter',
+      email: 'alex.carter@medivault.local',
+      bloodGroup: 'O+ Positive',
+      emergencyContact: '+1 (555) 234-5678',
+      phone: '+1 (555) 019-2834',
+    );
+  }
+
   Future<DiabetesPredictionResult> screenDiabetesRisk({
     required double glucose,
     required double bmi,
