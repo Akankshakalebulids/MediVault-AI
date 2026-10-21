@@ -10,7 +10,11 @@ import { HealthTimelinePage } from "./pages/HealthTimelinePage";
 import { HealthAnalyticsPage } from "./pages/HealthAnalyticsPage";
 import { DiabetesScreeningPage } from "./pages/DiabetesScreeningPage";
 import { ProfileSettingsPage } from "./pages/ProfileSettingsPage";
+import { MedicalDocumentsPage } from "./pages/MedicalDocumentsPage";
+import { MedicalExpensesPage } from "./pages/MedicalExpensesPage";
+import { DoctorVisitSummaryModal } from "./components/DoctorVisitSummaryModal";
 import { useAuth } from "./context/AuthContext";
+import { useFamily } from "./context/FamilyContext";
 import {
   getMedicalRecords,
   addMedicalRecord,
@@ -30,14 +34,17 @@ import { X, Plus, Bell, CheckCircle2, AlertCircle, Cloud, HardDrive, Server } fr
 
 export function App() {
   const { currentUser, isDemoMode, isFirebaseConfigured } = useAuth();
-  const userId = currentUser?.uid || "demo_user";
+  const { effectiveUserId, effectivePatientName, activeMember } = useFamily();
+  const userId = effectiveUserId || currentUser?.uid || "demo_user";
   const inCloudMode = isCloudMode(userId);
 
   const [active, setActive] = useState("Dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [doctorSummaryOpen, setDoctorSummaryOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+
 
   // App Data States
   const [records, setRecords] = useState([]);
@@ -263,7 +270,9 @@ export function App() {
           setSearchTerm={setSearchTerm}
           onOpenAuth={() => setAuthModalOpen(true)}
           onOpenNotifications={() => setNotificationsOpen(true)}
+          onOpenDoctorSummary={() => setDoctorSummaryOpen(true)}
         />
+
 
         <section className="content">
           {/* Cloud Error Alert */}
@@ -419,6 +428,10 @@ export function App() {
             />
           )}
 
+          {active === "Documents Vault" && <MedicalDocumentsPage />}
+
+          {active === "Medical Expenses" && <MedicalExpensesPage />}
+
           {active === "Medications" && (
             <MedicationsPage
               meds={meds}
@@ -427,6 +440,7 @@ export function App() {
               onDeleteMed={handleDeleteMed}
             />
           )}
+
 
           {active === "Appointments" && (
             <AppointmentsPage
@@ -571,6 +585,13 @@ export function App() {
 
       {/* Auth Modal */}
       <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+
+      {/* Doctor-Visit Clinical Summary Modal */}
+      <DoctorVisitSummaryModal
+        isOpen={doctorSummaryOpen}
+        onClose={() => setDoctorSummaryOpen(false)}
+      />
     </div>
   );
 }
+

@@ -85,40 +85,61 @@ MediVault AI adheres strictly to a modern healthcare SaaS **Green + White Theme*
 
 ## 4. Key Modules & Features
 
-### A. Dashboard
+### A. Dashboard & Chronic Health Vitals
 - Personalized greeting, vital summary cards, today's prescribed medication schedule, upcoming specialist visits, and recent lab reports.
 - Non-diagnostic educational disclaimer banner present on every surface.
+- **Evidence-Based Chronic Disease Guidance**: Contextual clinical notes regarding Glycemic Monitoring, Fasting vs Post-Prandial Blood Sugar, Blood Pressure threshold classification, and the critical **Erythrocyte Turnover / Anemia Caveat** on HbA1c interpretation.
 
-### B. Medical Records Management
+### B. Medical Documents Vault (OCR & AI Ingestion)
+- Secure repository for official clinical documents, laboratory PDFs, prescriptions, and radiology scans.
+- **AI-Assisted Document Extraction (OCR)**: Heuristic clinical NLP service automatically parses diagnostic parameters (Fasting Blood Sugar, HbA1c, BP, Lipid panels, Medications, Invoice amounts) with confidence metrics and interactive human-in-the-loop review.
+- Downloadable original files and direct one-click export into longitudinal Medical Records.
+
+### C. Medical Expenses Tracker (Indian Rupees ₹)
+- Dedicated healthcare expenditure tracking in Indian Rupees (₹) covering Doctor Consultations, Pharmacy, Diagnostics, Hospitalization, and Insurance Claims.
+- **Duplicate Invoice Detection**: Queries backend to warn users against double-booking bills with matching invoice numbers.
+- Aggregate analytics: Total expenditure, monthly trends, and visual category breakdown bars.
+
+### D. Multi-Patient Family Profiles & Switcher
+- Family-centric health management allowing users to manage records for **Self**, **Father**, **Mother**, **Spouse**, and **Child**.
+- Real-time profile switcher in topbar isolating medical records, medications, documents, and expenses per family member.
+
+### E. Doctor-Visit Clinical Summary Generator
+- Printable and downloadable consultation summary consolidating:
+  - Patient demographics & blood group
+  - Currently active medications with dosages and schedules
+  - Recent diagnostic laboratory findings
+  - Longitudinal chronic metabolic and cardiovascular indicators
+  - Curated, pertinent discussion questions for the attending physician.
+
+### F. Bilingual Localization (English & हिन्दी)
+- Full client localization supporting English and Hindi (हिन्दी) covering navigation, medical terminology, alerts, disclaimers, and interactive form fields.
+
+### G. Medical Records Management
 - Categorized diagnostic repository (Laboratory, Consultation, Prescription, Radiology, Immunization).
 - Real-time instant search by doctor, title, facility, or clinical note keywords.
 - Add, View Details, Edit, and Delete modal workflows with form validation.
 
-### C. Medication Management
+### H. Medication Management
 - Prescriptions with dosage, administration schedule, reminder times, and status pills (Active, Paused, Completed).
 - One-click Pause/Resume toggle for completed courses.
 
-### D. Care Appointments
+### I. Care Appointments
 - Dual-tab view: Upcoming Visits vs Past Consultations.
 - Doctor details, clinical specialty, clinic location, appointment date/time, and cancellation workflow.
 
-### E. Health Timeline
+### J. Health Timeline
 - Chronological longitudinal care feed unifying diagnostic records, doctor visits, and medication milestones.
 
-### F. Health Analytics & Vitals
-- Accessible, responsive SVG trend charts with standard physiological guideline bands:
-  - Fasting Blood Glucose (mg/dL) with normoglycemic target band (70-99 mg/dL).
-  - Blood Pressure (Systolic & Diastolic mm Hg).
-  - Body Mass Index (BMI kg/m²) with WHO healthy weight boundaries.
-
-### G. Diabetes Risk Screening (SMLD ML Engine)
+### K. Diabetes Risk Screening (SMLD ML Engine)
 - Interactive clinical risk assessment form (Age, BMI, Glucose, Blood Pressure, Pregnancies, Insulin, Skin Thickness, Pedigree Function).
 - Evaluator test presets (Low Risk, Moderate Risk, Elevated Risk).
 - Connected directly to the live Python FastAPI backend (`/api/v1/predict/diabetes`).
 - Probability percentage, risk tier badge, key contributing factors analysis, model metadata, and non-diagnostic clinical safety disclaimer.
 
-### H. Profile & Settings
+### L. Profile & Settings
 - Patient demographic information, blood group, emergency contact telephone number, Firebase cloud sync status indicator, and security rules disclosure.
+
 
 ---
 
@@ -158,7 +179,14 @@ MediVault/
 │   ├── IMPLEMENTATION_ROADMAP.md    # Six-phase delivery milestone plan
 │   ├── ASDD_REPORT.md               # 5 Epics, 15 User Stories, Jira mapping
 │   ├── WMAD_EVIDENCE.md             # Web, Mobile, Firebase, Spring Boot evidence
-│   └── SMLD_EVIDENCE.md             # ML methodology, benchmarking, viva notes
+│   ├── SMLD_EVIDENCE.md             # ML methodology, benchmarking, viva notes
+│   ├── literature-review.md         # Academic white paper & comprehensive literature review
+│   ├── references.bib               # Complete BibTeX bibliography with peer-reviewed references
+│   ├── model-evaluation.md          # Quantitative ML evaluation, ROC curves & confusion matrices
+│   ├── research-methodology.md      # Research protocol, biological imputation & validation matrix
+│   ├── security-and-privacy.md      # Multi-tenant isolation, DISHA/HIPAA compliance & error architecture
+│   └── limitations-and-future-work.md # Research limitations, phenotypic variations & future roadmap
+
 ├── web/                             # React 19 + Vite Web Application
 │   ├── .env.example                 # Firebase & ML URL configuration template
 │   ├── package.json

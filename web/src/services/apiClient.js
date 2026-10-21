@@ -30,10 +30,13 @@ export async function apiRequest(endpoint, options = {}, timeoutMs = 8000) {
   } catch (_) {}
 
   const defaultHeaders = {
-    "Content-Type": "application/json",
     Accept: "application/json",
     ...authHeader,
   };
+
+  if (!(options.body instanceof FormData)) {
+    defaultHeaders["Content-Type"] = "application/json";
+  }
 
   try {
     const response = await fetch(url, {
@@ -46,6 +49,7 @@ export async function apiRequest(endpoint, options = {}, timeoutMs = 8000) {
     });
 
     clearTimeout(timeoutId);
+
 
     // 204 No Content
     if (response.status === 204) {

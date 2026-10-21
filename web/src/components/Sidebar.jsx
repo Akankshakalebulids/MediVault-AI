@@ -11,20 +11,28 @@ import {
   ShieldCheck,
   LogOut,
   X,
-  Database
+  Database,
+  FolderArchive,
+  Receipt
 } from "lucide-react";
+import { useLanguage } from "../context/LanguageContext";
 
 export function Sidebar({ active, setActive, mobileOpen, setMobileOpen, onOpenAuth }) {
+  const { t } = useLanguage();
+
   const navItems = [
-    { id: "Dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "Medical Records", label: "Medical Records", icon: FileText },
-    { id: "Medications", label: "Medications", icon: Pill },
-    { id: "Appointments", label: "Appointments", icon: CalendarDays },
-    { id: "Health Timeline", label: "Health Timeline", icon: Activity },
-    { id: "Health Analytics", label: "Health Analytics", icon: TrendingUp },
-    { id: "Diabetes Screening", label: "Diabetes Screening", icon: HeartPulse, badge: "AI ML" },
-    { id: "Profile & Settings", label: "Profile & Settings", icon: UserRound }
+    { id: "Dashboard", label: t("nav_dashboard"), icon: LayoutDashboard },
+    { id: "Medical Records", label: t("nav_records"), icon: FileText },
+    { id: "Documents Vault", label: t("nav_documents"), icon: FolderArchive, badge: "OCR" },
+    { id: "Medical Expenses", label: t("nav_expenses"), icon: Receipt, badge: "INR ₹" },
+    { id: "Medications", label: t("nav_medications"), icon: Pill },
+    { id: "Appointments", label: t("nav_appointments"), icon: CalendarDays },
+    { id: "Health Timeline", label: t("nav_timeline"), icon: Activity },
+    { id: "Health Analytics", label: t("nav_analytics"), icon: TrendingUp },
+    { id: "Diabetes Screening", label: t("nav_diabetes"), icon: HeartPulse, badge: "AI ML" },
+    { id: "Profile & Settings", label: t("nav_profile"), icon: UserRound }
   ];
+
 
   return (
     <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>

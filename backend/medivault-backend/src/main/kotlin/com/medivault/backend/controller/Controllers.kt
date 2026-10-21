@@ -3,9 +3,13 @@ package com.medivault.backend.controller
 import com.medivault.backend.dto.*
 import com.medivault.backend.service.*
 import jakarta.validation.Valid
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import org.springframework.web.multipart.MultipartFile
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Health Check Controller
@@ -248,44 +252,236 @@ class HealthTimelineController(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Entity → Response Extension Functions
+// Medical Documents Controller
 // ═══════════════════════════════════════════════════════════════════════════════
 
-private fun com.medivault.backend.model.MedicalRecordEntity.toResponse() = MedicalRecordResponse(
-    id = id!!,
-    userId = userId,
-    title = title,
-    category = category,
-    doctor = doctor,
-    facility = facility,
-    date = date,
-    diagnosisNotes = diagnosisNotes,
-    status = status,
-    createdAt = createdAt.toString()
-)
+@RestController
+@RequestMapping("/api/v1/documents")
+class MedicalDocumentController(
+    private val documentService: MedicalDocumentService
+) {
+    @GetMapping
+    fun getAllDocuments(
+        @RequestParam(defaultValue = "demo_user") userId: String
+    ): ResponseEntity<List<MedicalDocumentResponse>> {
+        val docs = documentService.getDocuments(userId)
+        return ResponseEntity.ok(docs.map { it.toResponse() })
+    }
 
-private fun com.medivault.backend.model.MedicationEntity.toResponse() = MedicationResponse(
-    id = id!!,
-    userId = userId,
-    name = name,
-    dose = dose,
-    frequency = frequency,
-    time = time,
-    status = status,
-    instructions = instructions,
-    startDate = startDate,
-    createdAt = createdAt.toString()
-)
+    @GetMapping("/{id}")
+    fun getDocument(
+        @PathVariable id: Long,
+        @RequestParam(defaultValue = "demo_user") userId: String
+    ): ResponseEntity<MedicalDocumentResponse> {
+        val doc = documentService.getDocumentById(id, userId)
+        return ResponseEntity.ok(doc.toResponse())
+    }
 
-private fun com.medivault.backend.model.AppointmentEntity.toResponse() = AppointmentResponse(
-    id = id!!,
-    userId = userId,
-    doctorName = doctorName,
-    specialty = specialty,
-    clinicLocation = clinicLocation,
-    dateTime = dateTime,
-    reason = reason,
-    status = status,
-    notes = notes,
-    createdAt = createdAt.toString()
-)
+    @PostMapping
+    fun createDocumentMetadata(
+        @RequestParam(defaultValue = "demo_user") userId: String,
+        @Valid @RequestBody req: MedicalDocumentRequest
+    ): ResponseEntity<MedicalDocumentResponse> {
+        val doc = documentService.saveDocument(
+            userId = userId,
+            name = req.name,
+            category = req.category,
+            fileType = req.fileType,
+            notes = req.notes,
+            extractedText = req.extractedText,
+            file = null
+        )
+        return ResponseEntity.status(HttpStatus.CREATED).body(doc.toResponse())
+    }
+
+    @PostMapping("/upload", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
+    fun uploadDocument(
+        @RequestParam(defaultValue = "demo_user") userId: String,
+        @RequestParam("file") file: MultipartFile,
+        @RequestParam(defaultValue = "") name: String,
+        @RequestParam(defaultValue = "Laboratory Report") category: String,
+        @RequestParam(defaultValue = "") notes: String,
+        @RequestParam(defaultValue = "") extractedText: String
+    ): ResponseEntity<MedicalDocumentResponse> {
+        val doc = documentService.saveDocument(
+            userId = userId,
+            name = name,
+            category = category,
+            fileType = file.contentType ?: "application/octet-stream",
+            notes = notes,
+            extractedText = extractedText,
+            file = file
+        )
+        return ResponseEntity.status(HttpStatus.CREATED).body(doc.toResponse())
+    }
+
+    @GetMapping("/{id}/download")
+    fun downloadDocument(
+        @PathVariable id: Long,
+        @RequestParam(defaultValue = "demo_user") userId: String
+    ): ResponseEntity<ByteArray> {
+        val doc = documentService.getDocumentById(id, userId)
+        val data = documentService.loadDocumentResource(id, userId)
+        val mediaType = try {
+            MediaType.parseMediaType(doc.fileType)
+        } catch (_: Exception) {
+            MediaType.APPLICATION_OCTET_STREAM
+        }
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"${doc.name}\"")
+            .contentType(mediaType)
+            .body(data)
+    }
+
+    @DeleteMapping("/{id}")
+    fun deleteDocument(
+        @PathVariable id: Long,
+        @RequestParam(defaultValue = "demo_user") userId: String
+    ): ResponseEntity<Void> {
+        documentService.deleteDocument(id, userId)
+        return ResponseEntity.noContent().build()
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Medical Expenses Controller
+// ═══════════════════════════════════════════════════════════════════════════════
+
+@RestController
+@RequestMapping("/api/v1/expenses")
+class MedicalExpenseController(
+    private val expenseService: MedicalExpenseService
+) {
+    @GetMapping
+    fun getAllExpenses(
+        @RequestParam(defaultValue = "demo_user") userId: String
+    ): ResponseEntity<List<MedicalExpenseResponse>> {
+        val expenses = expenseService.getExpenses(userId)
+        return ResponseEntity.ok(expenses.map { it.toResponse() })
+    }
+
+    @GetMapping("/summary")
+    fun getSummary(
+        @RequestParam(defaultValue = "demo_user") userId: String
+    ): ResponseEntity<ExpenseSummaryResponse> {
+        return ResponseEntity.ok(expenseService.getSummary(userId))
+    }
+
+    @GetMapping("/check-duplicate")
+    fun checkDuplicate(
+        @RequestParam(defaultValue = "demo_user") userId: String,
+        @RequestParam billNumber: String
+    ): ResponseEntity<DuplicateInvoiceCheckResponse> {
+        return ResponseEntity.ok(expenseService.checkDuplicate(userId, billNumber))
+    }
+
+    @GetMapping("/{id}")
+    fun getExpense(
+        @PathVariable id: Long,
+        @RequestParam(defaultValue = "demo_user") userId: String
+    ): ResponseEntity<MedicalExpenseResponse> {
+        val expense = expenseService.getExpenseById(id, userId)
+        return ResponseEntity.ok(expense.toResponse())
+    }
+
+    @PostMapping
+    fun createExpense(
+        @RequestParam(defaultValue = "demo_user") userId: String,
+        @Valid @RequestBody req: MedicalExpenseRequest
+    ): ResponseEntity<MedicalExpenseResponse> {
+        val saved = expenseService.createExpense(userId, req)
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved.toResponse())
+    }
+
+    @PutMapping("/{id}")
+    fun updateExpense(
+        @PathVariable id: Long,
+        @RequestParam(defaultValue = "demo_user") userId: String,
+        @RequestBody req: MedicalExpenseRequest
+    ): ResponseEntity<MedicalExpenseResponse> {
+        val updated = expenseService.updateExpense(id, userId, req)
+        return ResponseEntity.ok(updated.toResponse())
+    }
+
+    @DeleteMapping("/{id}")
+    fun deleteExpense(
+        @PathVariable id: Long,
+        @RequestParam(defaultValue = "demo_user") userId: String
+    ): ResponseEntity<Void> {
+        expenseService.deleteExpense(id, userId)
+        return ResponseEntity.noContent().build()
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Family Profiles Controller
+// ═══════════════════════════════════════════════════════════════════════════════
+
+@RestController
+@RequestMapping("/api/v1/family")
+class FamilyMemberController(
+    private val familyService: FamilyMemberService
+) {
+    @GetMapping
+    fun getMembers(
+        @RequestParam(defaultValue = "demo_user") userId: String
+    ): ResponseEntity<List<FamilyMemberResponse>> {
+        val members = familyService.getMembers(userId)
+        return ResponseEntity.ok(members.map { it.toResponse() })
+    }
+
+    @GetMapping("/{id}")
+    fun getMember(
+        @PathVariable id: Long,
+        @RequestParam(defaultValue = "demo_user") userId: String
+    ): ResponseEntity<FamilyMemberResponse> {
+        val member = familyService.getMemberById(id, userId)
+        return ResponseEntity.ok(member.toResponse())
+    }
+
+    @PostMapping
+    fun createMember(
+        @RequestParam(defaultValue = "demo_user") userId: String,
+        @Valid @RequestBody req: FamilyMemberRequest
+    ): ResponseEntity<FamilyMemberResponse> {
+        val saved = familyService.createMember(userId, req)
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved.toResponse())
+    }
+
+    @PutMapping("/{id}")
+    fun updateMember(
+        @PathVariable id: Long,
+        @RequestParam(defaultValue = "demo_user") userId: String,
+        @RequestBody req: FamilyMemberRequest
+    ): ResponseEntity<FamilyMemberResponse> {
+        val updated = familyService.updateMember(id, userId, req)
+        return ResponseEntity.ok(updated.toResponse())
+    }
+
+    @DeleteMapping("/{id}")
+    fun deleteMember(
+        @PathVariable id: Long,
+        @RequestParam(defaultValue = "demo_user") userId: String
+    ): ResponseEntity<Void> {
+        familyService.deleteMember(id, userId)
+        return ResponseEntity.noContent().build()
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Doctor-Visit Summary Controller
+// ═══════════════════════════════════════════════════════════════════════════════
+
+@RestController
+@RequestMapping("/api/v1/summary")
+class DoctorVisitSummaryController(
+    private val summaryService: DoctorVisitSummaryService
+) {
+    @GetMapping("/doctor-visit")
+    fun getDoctorVisitSummary(
+        @RequestParam(defaultValue = "demo_user") userId: String
+    ): ResponseEntity<DoctorVisitSummaryResponse> {
+        return ResponseEntity.ok(summaryService.generateSummary(userId))
+    }
+}
+

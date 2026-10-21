@@ -35,3 +35,23 @@ interface AppointmentRepository : JpaRepository<AppointmentEntity, Long> {
 interface TimelineEventRepository : JpaRepository<TimelineEventEntity, Long> {
     fun findByUserIdOrderByDateDesc(userId: String): List<TimelineEventEntity>
 }
+
+@Repository
+interface MedicalDocumentRepository : JpaRepository<MedicalDocumentEntity, Long> {
+    fun findByUserIdOrderByUploadDateDesc(userId: String): List<MedicalDocumentEntity>
+    fun findByIdAndUserId(id: Long, userId: String): MedicalDocumentEntity?
+}
+
+@Repository
+interface MedicalExpenseRepository : JpaRepository<MedicalExpenseEntity, Long> {
+    fun findByUserIdOrderByDateDesc(userId: String): List<MedicalExpenseEntity>
+    fun findByIdAndUserId(id: Long, userId: String): MedicalExpenseEntity?
+    fun findByUserIdAndBillNumber(userId: String, billNumber: String): List<MedicalExpenseEntity>
+}
+
+@Repository
+interface FamilyMemberRepository : JpaRepository<FamilyMemberEntity, Long> {
+    fun findByUserIdOrderByCreatedAtAsc(userId: String): List<FamilyMemberEntity>
+    fun findByIdAndUserId(id: Long, userId: String): FamilyMemberEntity?
+}
+

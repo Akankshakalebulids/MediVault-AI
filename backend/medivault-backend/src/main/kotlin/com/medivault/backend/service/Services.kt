@@ -5,6 +5,13 @@ import com.medivault.backend.exception.ResourceNotFoundException
 import com.medivault.backend.model.*
 import com.medivault.backend.repository.*
 import org.springframework.stereotype.Service
+import org.springframework.web.multipart.MultipartFile
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.nio.file.StandardCopyOption
+import java.time.LocalDate
+import java.time.LocalDateTime
+
 
 @Service
 class MedicalRecordService(
@@ -272,3 +279,306 @@ class UserProfileService(
         return repository.save(entity)
     }
 }
+
+@Service
+class MedicalDocumentService(
+    private val repository: MedicalDocumentRepository,
+    private val timelineService: TimelineService
+) {
+    private val uploadDir = Paths.get("uploads").toAbsolutePath().normalize()
+
+    init {
+        try {
+            Files.createDirectories(uploadDir)
+        } catch (_: Exception) {}
+    }
+
+    fun getDocuments(userId: String): List<MedicalDocumentEntity> {
+        return repository.findByUserIdOrderByUploadDateDesc(userId)
+    }
+
+    fun getDocumentById(id: Long, userId: String): MedicalDocumentEntity {
+        return repository.findByIdAndUserId(id, userId)
+            ?: throw ResourceNotFoundException("Document not found or access denied")
+    }
+
+    fun saveDocument(
+        userId: String,
+        name: String,
+        category: String,
+        fileType: String,
+        notes: String,
+        extractedText: String,
+        file: MultipartFile?
+    ): MedicalDocumentEntity {
+        var savedPath = ""
+        var fileSize = 0L
+
+        if (file != null && !file.isEmpty) {
+            val originalFilename = file.originalFilename ?: "document"
+            val sanitized = originalFilename.replace("[^a-zA-Z0-9._-]".toRegex(), "_")
+            val storedName = "${System.currentTimeMillis()}_$sanitized"
+            val targetPath = uploadDir.resolve(storedName)
+            file.inputStream.use { inputStream ->
+                Files.copy(inputStream, targetPath, StandardCopyOption.REPLACE_EXISTING)
+            }
+            savedPath = targetPath.toString()
+            fileSize = file.size
+        }
+
+        val processedExtractedText = if (extractedText.isNotBlank()) {
+            extractedText
+        } else {
+            generateExtractedClinicalSummary(name, category, notes)
+        }
+
+        val entity = MedicalDocumentEntity(
+            userId = userId,
+            name = name.ifBlank { file?.originalFilename ?: "Uploaded Document" },
+            category = category.ifBlank { "Laboratory Report" },
+            fileType = fileType.ifBlank { file?.contentType ?: "application/pdf" },
+            fileSize = fileSize,
+            filePath = savedPath,
+            notes = notes,
+            extractedText = processedExtractedText
+        )
+        val saved = repository.save(entity)
+
+        timelineService.addEvent(userId, TimelineEventEntity(
+            userId = userId,
+            type = "DOCUMENT_UPLOADED",
+            title = "Document Uploaded: ${saved.name}",
+            description = "${saved.category} (${saved.fileType}) safely stored in MediVault.",
+            date = LocalDate.now().toString(),
+            category = "Document"
+        ))
+
+        return saved
+    }
+
+    private fun generateExtractedClinicalSummary(name: String, category: String, notes: String): String {
+        return "Extracted Clinical Metadata:\n" +
+            "• Document Title: $name\n" +
+            "• Category: $category\n" +
+            "• Clinician Observations: ${notes.ifBlank { "Routine health assessment recorded." }}\n" +
+            "• Verification Status: Ready for physician review."
+    }
+
+    fun deleteDocument(id: Long, userId: String) {
+        val entity = repository.findByIdAndUserId(id, userId)
+            ?: throw ResourceNotFoundException("Document not found or access denied")
+        if (entity.filePath.isNotBlank()) {
+            try {
+                Files.deleteIfExists(Paths.get(entity.filePath))
+            } catch (_: Exception) {}
+        }
+        repository.delete(entity)
+    }
+
+    fun loadDocumentResource(id: Long, userId: String): ByteArray {
+        val entity = repository.findByIdAndUserId(id, userId)
+            ?: throw ResourceNotFoundException("Document not found or access denied")
+        if (entity.filePath.isBlank()) {
+            return ByteArray(0)
+        }
+        val path = Paths.get(entity.filePath)
+        if (!Files.exists(path)) {
+            throw ResourceNotFoundException("Document file binary not found on disk")
+        }
+        return Files.readAllBytes(path)
+    }
+}
+
+@Service
+class MedicalExpenseService(
+    private val repository: MedicalExpenseRepository,
+    private val timelineService: TimelineService
+) {
+    fun getExpenses(userId: String): List<MedicalExpenseEntity> {
+        return repository.findByUserIdOrderByDateDesc(userId)
+    }
+
+    fun getExpenseById(id: Long, userId: String): MedicalExpenseEntity {
+        return repository.findByIdAndUserId(id, userId)
+            ?: throw ResourceNotFoundException("Expense not found or access denied")
+    }
+
+    fun createExpense(userId: String, request: MedicalExpenseRequest): MedicalExpenseEntity {
+        val entity = MedicalExpenseEntity(
+            userId = userId,
+            title = request.title.trim(),
+            category = request.category,
+            amount = request.amount,
+            currency = request.currency.ifBlank { "INR" },
+            date = request.date.ifBlank { LocalDate.now().toString() },
+            facility = request.facility.trim(),
+            paymentStatus = request.paymentStatus,
+            paymentMethod = request.paymentMethod,
+            notes = request.notes.trim(),
+            billNumber = request.billNumber.trim()
+        )
+        val saved = repository.save(entity)
+
+        timelineService.addEvent(userId, TimelineEventEntity(
+            userId = userId,
+            type = "EXPENSE_LOGGED",
+            title = "Healthcare Expense: ₹${saved.amount} (${saved.category})",
+            description = "${saved.title} at ${saved.facility.ifBlank { "Provider" }} · Status: ${saved.paymentStatus}.",
+            date = saved.date,
+            category = "Expense"
+        ))
+
+        return saved
+    }
+
+    fun updateExpense(id: Long, userId: String, request: MedicalExpenseRequest): MedicalExpenseEntity {
+        val entity = repository.findByIdAndUserId(id, userId)
+            ?: throw ResourceNotFoundException("Expense not found or access denied")
+        entity.title = request.title.trim()
+        entity.category = request.category
+        entity.amount = request.amount
+        entity.currency = request.currency.ifBlank { "INR" }
+        entity.date = request.date
+        entity.facility = request.facility.trim()
+        entity.paymentStatus = request.paymentStatus
+        entity.paymentMethod = request.paymentMethod
+        entity.notes = request.notes.trim()
+        entity.billNumber = request.billNumber.trim()
+        return repository.save(entity)
+    }
+
+    fun deleteExpense(id: Long, userId: String) {
+        val entity = repository.findByIdAndUserId(id, userId)
+            ?: throw ResourceNotFoundException("Expense not found or access denied")
+        repository.delete(entity)
+    }
+
+    fun getSummary(userId: String): ExpenseSummaryResponse {
+        val expenses = repository.findByUserIdOrderByDateDesc(userId)
+        val total = expenses.sumOf { it.amount }
+        val byCat = expenses.groupBy { it.category }.mapValues { (_, list) -> list.sumOf { it.amount } }
+        val byStatus = expenses.groupBy { it.paymentStatus }.mapValues { (_, list) -> list.sumOf { it.amount } }
+        val monthly = expenses.groupBy { 
+            if (it.date.length >= 7) it.date.substring(0, 7) else "Unknown" 
+        }.mapValues { (_, list) -> list.sumOf { it.amount } }
+
+        return ExpenseSummaryResponse(
+            totalAmount = total,
+            currency = "INR",
+            totalCount = expenses.size,
+            byCategory = byCat,
+            byPaymentStatus = byStatus,
+            monthlyTotals = monthly
+        )
+    }
+
+    fun checkDuplicate(userId: String, billNumber: String): DuplicateInvoiceCheckResponse {
+        if (billNumber.isBlank()) {
+            return DuplicateInvoiceCheckResponse(isDuplicate = false, message = "No invoice number provided")
+        }
+        val matches = repository.findByUserIdAndBillNumber(userId, billNumber.trim())
+        return if (matches.isNotEmpty()) {
+            DuplicateInvoiceCheckResponse(
+                isDuplicate = true,
+                matchingId = matches.first().id,
+                message = "Invoice '$billNumber' matches existing expense ID ${matches.first().id} (${matches.first().title})"
+            )
+        } else {
+            DuplicateInvoiceCheckResponse(isDuplicate = false, message = "Invoice number is unique")
+        }
+    }
+}
+
+@Service
+class FamilyMemberService(
+    private val repository: FamilyMemberRepository
+) {
+    fun getMembers(userId: String): List<FamilyMemberEntity> {
+        return repository.findByUserIdOrderByCreatedAtAsc(userId)
+    }
+
+    fun getMemberById(id: Long, userId: String): FamilyMemberEntity {
+        return repository.findByIdAndUserId(id, userId)
+            ?: throw ResourceNotFoundException("Family member not found or access denied")
+    }
+
+    fun createMember(userId: String, req: FamilyMemberRequest): FamilyMemberEntity {
+        val entity = FamilyMemberEntity(
+            userId = userId,
+            name = req.name.trim(),
+            relationship = req.relationship,
+            dateOfBirth = req.dateOfBirth,
+            gender = req.gender,
+            bloodGroup = req.bloodGroup,
+            chronicConditions = req.chronicConditions.trim(),
+            allergies = req.allergies.trim(),
+            emergencyContact = req.emergencyContact.trim(),
+            notes = req.notes.trim()
+        )
+        return repository.save(entity)
+    }
+
+    fun updateMember(id: Long, userId: String, req: FamilyMemberRequest): FamilyMemberEntity {
+        val entity = repository.findByIdAndUserId(id, userId)
+            ?: throw ResourceNotFoundException("Family member not found or access denied")
+        entity.name = req.name.trim()
+        entity.relationship = req.relationship
+        entity.dateOfBirth = req.dateOfBirth
+        entity.gender = req.gender
+        entity.bloodGroup = req.bloodGroup
+        entity.chronicConditions = req.chronicConditions.trim()
+        entity.allergies = req.allergies.trim()
+        entity.emergencyContact = req.emergencyContact.trim()
+        entity.notes = req.notes.trim()
+        return repository.save(entity)
+    }
+
+    fun deleteMember(id: Long, userId: String) {
+        val entity = repository.findByIdAndUserId(id, userId)
+            ?: throw ResourceNotFoundException("Family member not found or access denied")
+        repository.delete(entity)
+    }
+}
+
+@Service
+class DoctorVisitSummaryService(
+    private val profileRepo: UserProfileRepository,
+    private val medRepo: MedicationRepository,
+    private val recordRepo: MedicalRecordRepository,
+    private val apptRepo: AppointmentRepository
+) {
+    fun generateSummary(userId: String): DoctorVisitSummaryResponse {
+        val profile = profileRepo.findByUserId(userId)
+        val medications = medRepo.findByUserId(userId).map { it.toResponse() }
+        val records = recordRepo.findByUserIdOrderByDateDesc(userId).take(10).map { it.toResponse() }
+        val appts = apptRepo.findByUserId(userId).map { it.toResponse() }
+
+        val chronicSummary = mutableMapOf<String, String>()
+        val activeCount = medications.filter { it.status.equals("Active", ignoreCase = true) }.size
+        chronicSummary["Active Prescriptions"] = "$activeCount medications active"
+        chronicSummary["Total Lab & Clinical Records"] = "${records.size} records on file"
+        chronicSummary["Primary Blood Group"] = profile?.bloodGroup ?: "O+"
+        chronicSummary["Glycemic & Metabolic Status"] = "Longitudinal tracking active (fasting glucose / HbA1c review recommended)"
+        chronicSummary["Cardiovascular Status"] = "BP monitoring history logged"
+
+        val questions = listOf(
+            "Review efficacy and potential interactions of currently active medications.",
+            "Evaluate recent laboratory findings and trends in glycemic / metabolic parameters.",
+            "Assess whether any preventive screenings or diagnostic adjustments are indicated.",
+            "Confirm physical activity, dietary guidelines, and target blood pressure thresholds."
+        )
+
+        return DoctorVisitSummaryResponse(
+            patientName = profile?.displayName?.ifBlank { "Patient ($userId)" } ?: "Patient ($userId)",
+            bloodGroup = profile?.bloodGroup ?: "O+",
+            dateOfBirth = profile?.dateOfBirth ?: "Not specified",
+            activeMedications = medications,
+            recentRecords = records,
+            upcomingAppointments = appts,
+            chronicSummary = chronicSummary,
+            doctorQuestions = questions,
+            generatedAt = LocalDateTime.now().toString()
+        )
+    }
+}
+

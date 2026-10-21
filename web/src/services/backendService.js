@@ -110,4 +110,101 @@ export const backendService = {
       body: JSON.stringify(profileData),
     });
   },
+
+  // ── Medical Documents Vault ──
+  async getDocuments(userId = "demo_user") {
+    return apiRequest(`/api/v1/documents?userId=${encodeURIComponent(userId)}`, { method: "GET" });
+  },
+
+  async getDocument(id, userId = "demo_user") {
+    return apiRequest(`/api/v1/documents/${id}?userId=${encodeURIComponent(userId)}`, { method: "GET" });
+  },
+
+  async createDocument(userId = "demo_user", docData) {
+    return apiRequest(`/api/v1/documents?userId=${encodeURIComponent(userId)}`, {
+      method: "POST",
+      body: JSON.stringify(docData),
+    });
+  },
+
+  async uploadDocument(userId = "demo_user", formData) {
+    return apiRequest(`/api/v1/documents/upload?userId=${encodeURIComponent(userId)}`, {
+      method: "POST",
+      body: formData,
+    });
+  },
+
+  getDocumentDownloadUrl(id, userId = "demo_user") {
+    return `${BACKEND_BASE_URL}/api/v1/documents/${id}/download?userId=${encodeURIComponent(userId)}`;
+  },
+
+  async deleteDocument(id, userId = "demo_user") {
+    return apiRequest(`/api/v1/documents/${id}?userId=${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    });
+  },
+
+  // ── Medical Expenses Tracker ──
+  async getExpenses(userId = "demo_user") {
+    return apiRequest(`/api/v1/expenses?userId=${encodeURIComponent(userId)}`, { method: "GET" });
+  },
+
+  async getExpenseSummary(userId = "demo_user") {
+    return apiRequest(`/api/v1/expenses/summary?userId=${encodeURIComponent(userId)}`, { method: "GET" });
+  },
+
+  async checkDuplicateInvoice(userId = "demo_user", billNumber = "") {
+    return apiRequest(`/api/v1/expenses/check-duplicate?userId=${encodeURIComponent(userId)}&billNumber=${encodeURIComponent(billNumber)}`, { method: "GET" });
+  },
+
+  async createExpense(userId = "demo_user", expenseData) {
+    return apiRequest(`/api/v1/expenses?userId=${encodeURIComponent(userId)}`, {
+      method: "POST",
+      body: JSON.stringify(expenseData),
+    });
+  },
+
+  async updateExpense(id, userId = "demo_user", expenseData) {
+    return apiRequest(`/api/v1/expenses/${id}?userId=${encodeURIComponent(userId)}`, {
+      method: "PUT",
+      body: JSON.stringify(expenseData),
+    });
+  },
+
+  async deleteExpense(id, userId = "demo_user") {
+    return apiRequest(`/api/v1/expenses/${id}?userId=${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    });
+  },
+
+  // ── Family Profiles ──
+  async getFamilyMembers(userId = "demo_user") {
+    return apiRequest(`/api/v1/family?userId=${encodeURIComponent(userId)}`, { method: "GET" });
+  },
+
+  async createFamilyMember(userId = "demo_user", memberData) {
+    return apiRequest(`/api/v1/family?userId=${encodeURIComponent(userId)}`, {
+      method: "POST",
+      body: JSON.stringify(memberData),
+    });
+  },
+
+  async updateFamilyMember(id, userId = "demo_user", memberData) {
+    return apiRequest(`/api/v1/family/${id}?userId=${encodeURIComponent(userId)}`, {
+      method: "PUT",
+      body: JSON.stringify(memberData),
+    });
+  },
+
+  async deleteFamilyMember(id, userId = "demo_user") {
+    return apiRequest(`/api/v1/family/${id}?userId=${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    });
+  },
+
+  // ── Doctor Visit Summary ──
+  async getDoctorVisitSummary(userId = "demo_user") {
+    return apiRequest(`/api/v1/summary/doctor-visit?userId=${encodeURIComponent(userId)}`, { method: "GET" });
+  },
 };
+

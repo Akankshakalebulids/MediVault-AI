@@ -1201,3 +1201,47 @@ tr:hover td {
     font-size: 22px;
   }
 }
+
+/* ==========================================================================
+   Modal Container & Print Styles
+   ========================================================================== */
+.modal-container {
+  background: var(--bg-surface, #ffffff);
+  border-radius: var(--radius-xl, 16px);
+  border: 1px solid var(--border-light, #e2e8f0);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  padding: 24px;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-friendly, .print-friendly * {
+    visibility: visible;
+  }
+  .print-friendly {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+
+.hide-on-mobile {
+  display: inline;
+}
+
+@media (max-width: 768px) {
+  .hide-on-mobile {
+    display: none;
+  }
+}
+

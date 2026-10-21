@@ -28,6 +28,19 @@ class ApiControllerTests {
     @Autowired
     private lateinit var userProfileController: UserProfileController
 
+    @Autowired
+    private lateinit var documentController: MedicalDocumentController
+
+    @Autowired
+    private lateinit var expenseController: MedicalExpenseController
+
+    @Autowired
+    private lateinit var familyController: FamilyMemberController
+
+    @Autowired
+    private lateinit var summaryController: DoctorVisitSummaryController
+
+
     @Test
     fun testHealthEndpoint() {
         val health = healthController.health()
@@ -198,4 +211,177 @@ class ApiControllerTests {
         assertTrue(events.isNotEmpty())
         assertTrue(events.any { it.title.contains("Lab Test Results") })
     }
+
+    @Test
+    fun testMedicalDocumentLifecycle() {
+        val userId = "test_user_doc_1"
+        val req = MedicalDocumentRequest(
+            name = "Lipid_Profile_Report.pdf",
+            category = "Laboratory Report",
+            fileType = "application/pdf",
+            notes = "Total cholesterol 185 mg/dL, HDL 55 mg/dL",
+            extractedText = "Total Cholesterol: 185, HDL: 55, LDL: 105"
+        )
+
+        // Create
+        val createResp = documentController.createDocumentMetadata(userId, req)
+        assertEquals(201, createResp.statusCode.value())
+        val doc = createResp.body!!
+        assertEquals("Lipid_Profile_Report.pdf", doc.name)
+        assertEquals(userId, doc.userId)
+
+        // List
+        val listResp = documentController.getAllDocuments(userId)
+        assertEquals(200, listResp.statusCode.value())
+        assertTrue(listResp.body!!.any { it.id == doc.id })
+
+        // Get single
+        val getResp = documentController.getDocument(doc.id, userId)
+        assertEquals(200, getResp.statusCode.value())
+        assertEquals("Lipid_Profile_Report.pdf", getResp.body!!.name)
+
+        // Delete
+        val delResp = documentController.deleteDocument(doc.id, userId)
+        assertEquals(204, delResp.statusCode.value())
+    }
+
+    @Test
+    fun testMedicalExpenseLifecycleAndAnalytics() {
+        val userId = "test_user_expense_1"
+        val req = MedicalExpenseRequest(
+            title = "Endocrinologist Consultation",
+            category = "Doctor Consultations",
+            amount = 1500.0,
+            currency = "INR",
+            date = "2026-04-12",
+            facility = "Apollo Clinic",
+            paymentStatus = "Paid",
+            paymentMethod = "UPI",
+            billNumber = "INV-2026-9901"
+        )
+
+        // Create
+        val createResp = expenseController.createExpense(userId, req)
+        assertEquals(201, createResp.statusCode.value())
+        val expense = createResp.body!!
+        assertEquals(1500.0, expense.amount)
+        assertEquals("INV-2026-9901", expense.billNumber)
+
+        // Duplicate Check
+        val dupResp = expenseController.checkDuplicate(userId, "INV-2026-9901")
+        assertEquals(200, dupResp.statusCode.value())
+        assertTrue(dupResp.body!!.isDuplicate)
+        assertEquals(expense.id, dupResp.body!!.matchingId)
+
+        val nonDupResp = expenseController.checkDuplicate(userId, "INV-NONEXISTENT")
+        assertFalse(nonDupResp.body!!.isDuplicate)
+
+        // Analytics Summary
+        val summaryResp = expenseController.getSummary(userId)
+        assertEquals(200, summaryResp.statusCode.value())
+        val summary = summaryResp.body!!
+        assertTrue(summary.totalAmount >= 1500.0)
+        assertEquals("INR", summary.currency)
+        assertTrue(summary.byCategory.containsKey("Doctor Consultations"))
+
+        // Update
+        val updateResp = expenseController.updateExpense(
+            expense.id,
+            userId,
+            req.copy(amount = 1800.0)
+        )
+        assertEquals(200, updateResp.statusCode.value())
+        assertEquals(1800.0, updateResp.body!!.amount)
+
+        // Delete
+        val delResp = expenseController.deleteExpense(expense.id, userId)
+        assertEquals(204, delResp.statusCode.value())
+    }
+
+    @Test
+    fun testFamilyMemberLifecycle() {
+        val userId = "test_user_family_1"
+        val req = FamilyMemberRequest(
+            name = "Ramesh Kumar",
+            relationship = "Father",
+            dateOfBirth = "1960-05-14",
+            gender = "Male",
+            bloodGroup = "B+",
+            chronicConditions = "Hypertension, Type-2 Diabetes",
+            allergies = "Penicillin",
+            emergencyContact = "+91-9876543210",
+            notes = "Requires periodic blood sugar monitoring."
+        )
+
+        // Create
+        val createResp = familyController.createMember(userId, req)
+        assertEquals(201, createResp.statusCode.value())
+        val member = createResp.body!!
+        assertEquals("Ramesh Kumar", member.name)
+        assertEquals("Father", member.relationship)
+
+        // List
+        val listResp = familyController.getMembers(userId)
+        assertEquals(200, listResp.statusCode.value())
+        assertTrue(listResp.body!!.any { it.id == member.id })
+
+        // Get single
+        val getResp = familyController.getMember(member.id, userId)
+        assertEquals(200, getResp.statusCode.value())
+        assertEquals("B+", getResp.body!!.bloodGroup)
+
+        // Update
+        val updateResp = familyController.updateMember(
+            member.id,
+            userId,
+            req.copy(notes = "Updated emergency contact information.")
+        )
+        assertEquals(200, updateResp.statusCode.value())
+        assertEquals("Updated emergency contact information.", updateResp.body!!.notes)
+
+        // Delete
+        val delResp = familyController.deleteMember(member.id, userId)
+        assertEquals(204, delResp.statusCode.value())
+    }
+
+    @Test
+    fun testDoctorVisitSummary() {
+        val userId = "test_user_summary_1"
+        userProfileController.updateProfile(
+            userId,
+            UserProfileRequest(
+                displayName = "Amit Sharma",
+                bloodGroup = "O+",
+                dateOfBirth = "1988-11-22"
+            )
+        )
+        medicationController.createMedication(
+            userId,
+            MedicationRequest(
+                name = "Amlodipine",
+                dose = "5mg",
+                frequency = "Once daily",
+                status = "Active"
+            )
+        )
+        recordController.createRecord(
+            userId,
+            MedicalRecordRequest(
+                title = "Fasting Blood Glucose Test",
+                category = "Laboratory",
+                diagnosisNotes = "Fasting glucose 118 mg/dL (Impaired fasting glucose)"
+            )
+        )
+
+        val summaryResp = summaryController.getDoctorVisitSummary(userId)
+        assertEquals(200, summaryResp.statusCode.value())
+        val summary = summaryResp.body!!
+        assertEquals("Amit Sharma", summary.patientName)
+        assertEquals("O+", summary.bloodGroup)
+        assertTrue(summary.activeMedications.any { it.name == "Amlodipine" })
+        assertTrue(summary.recentRecords.any { it.title.contains("Fasting") })
+        assertTrue(summary.doctorQuestions.isNotEmpty())
+        assertTrue(summary.chronicSummary.isNotEmpty())
+    }
 }
+
